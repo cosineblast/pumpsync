@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 )
@@ -124,34 +125,34 @@ func FocusAudio(path string) (*FocusSuccess, error) {
 
 func CutAudio(path string, startOffset float64, endOffset float64) (string, error) {
 
-	tempFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg.wav")
+	logFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_stderr.txt")
+	logFile.Close()
 
 	if err != nil {
 		return "", err
 	}
 
-	tempPath := tempFile.Name()
+	outputFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_cut.wav")
 
-	tempFile.Close()
+	if err != nil {
+		return "", err
+	}
 
-	defer func() {
-		if err != nil {
-			os.Remove(tempPath)
-		}
-	}()
+	outputPath := outputFile.Name()
+
+	outputFile.Close()
 
 	cmd := exec.Command(
-        "ffmpeg", 
-        "-y", // don't ask for overwrite confirmation
-        "-ss", fmt.Sprint(startOffset), // seek to this offset
-        "-t", fmt.Sprint(endOffset-startOffset), // and take this many seconds
-        "-i", path, // of this file
+		"ffmpeg",
+		"-y",                           // don't ask for overwrite confirmation
+		"-ss", fmt.Sprint(startOffset), // seek to this offset
+		"-t", fmt.Sprint(endOffset-startOffset), // and take this many seconds
+		"-i", path, // of this file
 		"-af", // and remove silence from start and end
 		"silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB:stop_periods=1:stop_duration=0:stop_threshold=-50dB",
-		tempPath)
+		outputPath)
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = logFile
 
 	err = cmd.Run()
 
@@ -159,7 +160,51 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
 		return "", err
 	}
 
-	return tempPath, nil
+	return outputPath, nil
+}
+
+func trimAndLocate(foregroundPath string, backgroundPath string) (string, float64, float64, error) {
+
+	log.Println("Checking if foreground audio needs a cut...")
+
+	match, err := FocusAudio(foregroundPath)
+
+	finalForegroundPath := foregroundPath
+
+	if err != nil {
+		focusFail, ok := err.(FocusFail)
+		if !ok {
+			log.Println("error while trying to focus:", err)
+			return "", 0, 0, err
+		}
+
+		log.Println("file did not match with known delimiters")
+		log.Println("attempts:", focusFail.attempts)
+
+		// TODO: trim audio from this audio nonetheless
+	} else {
+		log.Printf("file matched delimiter %s (%f, %f)!\n", match.Identifier, match.StartScore, match.EndScore)
+
+		log.Printf("performing cut to range (%f:%f)\n", match.LeftCut, match.RightCut)
+
+		result, err := CutAudio(foregroundPath, match.LeftCut, match.RightCut)
+
+		if err != nil {
+			log.Println("failed to cut audio:", err)
+			return "", 0, 0, err
+		}
+
+		finalForegroundPath = result
+	}
+
+	offset, score, _, err := locateAudio(backgroundPath, finalForegroundPath)
+
+	if err != nil {
+		log.Println("faield to locate fg audio in bg:", err)
+		return "", 0, 0, err
+	}
+
+	return finalForegroundPath, offset, score, nil
 }
 
 func main() {
@@ -169,50 +214,19 @@ func main() {
 	flag.Parse()
 
 	if *foregroundPath == "" || *backgroundPath == "" {
-		fmt.Println("error: missing flags")
-		fmt.Println("TODO: use cli arg lib")
+		log.Println("error: missing flags")
+		// TODO: use cli arg lib
 		os.Exit(1)
 	}
 
-	fmt.Println("Checking if foreground audio needs a cut...")
-
-	match, err := FocusAudio(*foregroundPath)
-
-	finalForegroundPath := *foregroundPath
+	trimmedPath, offset, score, err := trimAndLocate(*foregroundPath, *backgroundPath)
 
 	if err != nil {
-		focusFail, ok := err.(FocusFail)
-		if !ok {
-			fmt.Println("error while trying to focus:", err)
-			os.Exit(1)
-		}
-
-		fmt.Println("file did not match with known delimiters")
-		fmt.Println("attempts:", focusFail.attempts)
-	} else {
-		fmt.Printf("file matched delimiter %s (%f, %f)!\n", match.Identifier, match.StartScore, match.EndScore)
-
-		fmt.Printf("performing cut to range (%f:%f)\n", match.LeftCut, match.RightCut)
-
-		result, err := CutAudio(*foregroundPath, match.LeftCut, match.RightCut)
-
-		if err != nil {
-			fmt.Println("failed to cut audio:", err)
-			os.Exit(1)
-		}
-
-		finalForegroundPath = result
-
-		fmt.Println("result path: ", result)
-	}
-
-	offset, score, _, err := locateAudio(*backgroundPath, finalForegroundPath)
-
-	if err != nil {
-		fmt.Println("faield to locate fg audio in bg:", err)
+		log.Println("error: failed to locate fg in bg", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("offset: ", offset)
-	fmt.Println("score: ", score)
+    fmt.Println("path of foreground used in location: ", trimmedPath)
+	fmt.Println("offset:", offset)
+	fmt.Println("score:", score)
 }
