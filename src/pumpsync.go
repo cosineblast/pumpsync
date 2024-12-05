@@ -137,6 +137,13 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
 		return "", err
 	}
 
+    defer func() {
+        if err != nil {
+            os.Remove(outputFile.Name())
+        }
+    }()
+
+
 	outputPath := outputFile.Name()
 
 	outputFile.Close()
@@ -252,6 +259,13 @@ func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset 
 		return "", err
 	}
 
+    defer func() {
+        if err != nil {
+            os.Remove(outputFile.Name())
+        }
+    }()
+
+
 	outputPath := outputFile.Name()
 
 	outputFile.Close()
@@ -299,9 +313,16 @@ func downloadYoutubeVideo(link string) (string, error) {
 		return "", err
 	}
 
-	outputPath := outputFile.Name()
+    defer func() {
+        if err != nil {
+            os.Remove(outputFile.Name())
+        }
+    }()
 
 	outputFile.Close()
+
+	outputPath := outputFile.Name()
+
 
     cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]",
     "--force-overwrites",
@@ -326,6 +347,13 @@ func extractAudioFromVideo(videoPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+    defer func() {
+        if err != nil {
+            os.Remove(audioFile.Name())
+        }
+    }()
+
 
 	audioFile.Close()
 
@@ -383,11 +411,15 @@ func improveVideoQualityFromYoutube(backgroundVideoPath string, youtubeLink stri
 
 	backgroundAudioPath, err := extractAudioFromVideo(backgroundVideoPath)
 
+	defer os.Remove(backgroundAudioPath)
+
 	if err != nil {
 		return err
 	}
 
 	foregroundAudioPath, err := extractAudioFromVideo(foregroundVideoPath)
+
+	defer os.Remove(foregroundAudioPath)
 
 	if err != nil {
 		return err
@@ -395,13 +427,21 @@ func improveVideoQualityFromYoutube(backgroundVideoPath string, youtubeLink stri
 
 	trimmedPath, offset, score, err := trimAndLocate(foregroundAudioPath, backgroundAudioPath)
 
+	defer os.Remove(trimmedPath)
+
 	if score < MINIMUM_FINAL_MATCH_SCORE {
 		return tooLowScoreError
 	}
 
 	finalAudio, err := overwriteAudioSegment(trimmedPath, backgroundAudioPath, offset)
 
-	overwriteVideoAudio(backgroundVideoPath, finalAudio, outputFilePath)
+	defer os.Remove(finalAudio)
+
+	err = overwriteVideoAudio(backgroundVideoPath, finalAudio, outputFilePath)
+
+    if err != nil {
+        return err
+    }
 
 	return nil
 }
