@@ -150,12 +150,12 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
 		`silenceremove=
             start_periods=1
             :start_duration=0
-            :start_threshold=-50dB
+            :start_threshold=-30dB
         ,areverse
         ,silenceremove=
             start_periods=1
             :start_duration=0
-            :start_threshold=-50dB
+            :start_threshold=-30dB
         ,areverse`,
 		outputPath)
 
