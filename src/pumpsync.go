@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 
+    "github.com/urfave/cli/v3"
+    "context"
 	"strconv"
 	"strings"
 )
@@ -302,7 +303,7 @@ func downloadYoutubeVideo(link string) (string, error) {
 
 	outputFile.Close()
 
-    cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]", 
+    cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]",
     "--force-overwrites",
     "-o", outputPath)
     log.Println("running yt-dlp")
@@ -406,21 +407,51 @@ func improveVideoQualityFromYoutube(backgroundVideoPath string, youtubeLink stri
 }
 
 func main() {
-	link := flag.String("link", "", "The link to the youtube video")
-	backgroundPath := flag.String("bg", "", "The path to the background video")
-	outputpath := flag.String("o", "", "The location to write the modified background video")
+    cmd := &cli.Command{
+        Name: "audio",
+        Flags: []cli.Flag{
+            &cli.StringFlag{
+                Name:  "background",
+                Aliases:     []string{"bg"},
+                Usage: "Path to the video containing the gameplay",
+                Required: true,
+            },
 
-	flag.Parse()
+            &cli.StringFlag{
+                Name: "link",
+                Aliases:     []string{"l"},
+                Usage: "Link to youtube video with the high-quality recording of music you want to overwite with",
+                Required: true,
+            },
 
-	if *link == "" || *backgroundPath == "" {
-		log.Println("error: missing flags")
-		// TODO: use cli arg lib
-		os.Exit(1)
-	}
+            &cli.StringFlag{
+                Name: "output",
+                Aliases:     []string{"o"},
+                Usage: "The location to write the modified background video",
+                Required: true,
+            },
+        },
 
-    err := improveVideoQualityFromYoutube(*backgroundPath, *link, *outputpath)
+        Usage: "Overwite audio of an video with music from youtube",
 
-    if err != nil {
+        Action: func(ctx context.Context, cmd *cli.Command) error {
+
+            link := cmd.String("link")
+            backgroundPath := cmd.String("background")
+            outputpath := cmd.String("output")
+
+            err := improveVideoQualityFromYoutube(backgroundPath, link, outputpath)
+
+            if err != nil {
+                log.Fatal(err)
+                os.Exit(1)
+            }
+
+            return nil
+        },
+    }
+
+    if err := cmd.Run(context.Background(), os.Args); err != nil {
         log.Fatal(err)
         os.Exit(1)
     }
