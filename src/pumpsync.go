@@ -89,7 +89,7 @@ func adjustCutOffset(startOffset float64, startDuration float64, endOffset float
 
 }
 
-func FocusAudio(path string) (*FocusSuccess, error) {
+func focusAudio(path string) (*FocusSuccess, error) {
 
 	audioPairs := []struct {
 		key       string
@@ -110,6 +110,8 @@ func FocusAudio(path string) (*FocusSuccess, error) {
 			return nil, err
 		}
 
+        log.Println("checking if audio matches ", entry.key)
+
 		endOffset, endScore, _, err := locateAudio(path, entry.endPath)
 
 		if err != nil {
@@ -129,7 +131,51 @@ func FocusAudio(path string) (*FocusSuccess, error) {
 
 }
 
-func CutAudio(path string, startOffset float64, endOffset float64) (string, error) {
+func trimAudioSilence(path string) (string, error) {
+	outputFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_trim.wav")
+
+	if err != nil {
+		return "", err
+	}
+
+    defer func() {
+        if err != nil {
+            os.Remove(outputFile.Name())
+        }
+    }()
+
+	outputFile.Close()
+
+	outputPath := outputFile.Name()
+
+	cmd := exec.Command(
+		"ffmpeg",
+		"-y",       // don't ask for overwrite confirmation
+		"-i", path, // read from this file as input 0
+		"-af",      // and remove silence from start and end
+		`silenceremove=
+            start_periods=1
+            :start_duration=0
+            :start_threshold=-30dB
+        ,areverse
+        ,silenceremove=
+            start_periods=1
+            :start_duration=0
+            :start_threshold=-30dB
+        ,areverse`,
+		outputPath)
+
+    log.Println("running ffmpeg for silence removal")
+	err = cmd.Run()
+
+	if err != nil {
+		return "", err
+	}
+
+	return outputPath, nil
+}
+
+func cutAudio(path string, startOffset float64, endOffset float64) (string, error) {
 
 	outputFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_cut.wav")
 
@@ -153,21 +199,10 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
 		"-y",                           // don't ask for overwrite confirmation
 		"-ss", fmt.Sprint(startOffset), // seek to this offset
 		"-t", fmt.Sprint(endOffset-startOffset), // and take this many seconds
-		"-i", path, // of this file
-		"-af", // and remove silence from start and end
-		`silenceremove=
-            start_periods=1
-            :start_duration=0
-            :start_threshold=-30dB
-        ,areverse
-        ,silenceremove=
-            start_periods=1
-            :start_duration=0
-            :start_threshold=-30dB
-        ,areverse`,
+		"-i", path,                              // of this file
 		outputPath)
 
-    log.Println("running ffmpeg for silence removal and cut")
+    log.Println("running ffmpeg for cut")
 	err = cmd.Run()
 
 	if err != nil {
@@ -177,49 +212,55 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
 	return outputPath, nil
 }
 
-func trimAndLocate(foregroundPath string, backgroundPath string) (string, float64, float64, error) {
+func focusAndTrim(foregroundPath string) (string, error) {
 
 	log.Println("Checking if foreground audio needs a cut...")
 
-	match, err := FocusAudio(foregroundPath)
-
-	finalForegroundPath := foregroundPath
+	match, err := focusAudio(foregroundPath)
 
 	if err != nil {
 		focusFail, ok := err.(FocusFail)
 		if !ok {
 			log.Println("error while trying to focus:", err)
-			return "", 0, 0, err
+			return "", err
 		}
 
 		log.Println("file did not match with known delimiters")
-		log.Println("attempts:", focusFail.attempts)
+		log.Println("scores:", focusFail.attempts)
 
-		os.Exit(1)
-		// TODO: trim audio from this audio nonetheless
+		result, err := trimAudioSilence(foregroundPath)
+
+		if err != nil {
+			return "", err
+		}
+
+        return result, nil
+
 	} else {
 		log.Printf("file matched delimiter %s (%f, %f)!\n", match.Identifier, match.StartScore, match.EndScore)
 
 		log.Printf("performing cut to range (%f:%f)\n", match.LeftCut, match.RightCut)
 
-		result, err := CutAudio(foregroundPath, match.LeftCut, match.RightCut)
+		cutted, err := cutAudio(foregroundPath, match.LeftCut, match.RightCut)
 
 		if err != nil {
-			log.Println("failed to cut audio:", err)
-			return "", 0, 0, err
+			return "", err
 		}
 
-		finalForegroundPath = result
+        defer func() {
+            if err != nil {
+                os.Remove(cutted)
+            }
+        }()
+
+        trimmed, err := trimAudioSilence(cutted)
+
+		if err != nil {
+			return "", err
+		}
+
+        return trimmed, err
 	}
-
-	offset, score, _, err := locateAudio(backgroundPath, finalForegroundPath)
-
-	if err != nil {
-		log.Println("faield to locate fg audio in bg:", err)
-		return "", 0, 0, err
-	}
-
-	return finalForegroundPath, offset, score, nil
 }
 
 func getFileDuration(path string) (float64, error) {
@@ -425,15 +466,21 @@ func improveVideoQualityFromYoutube(backgroundVideoPath string, youtubeLink stri
 		return err
 	}
 
-	trimmedPath, offset, score, err := trimAndLocate(foregroundAudioPath, backgroundAudioPath)
+	trimmedForegroundAudioPath, err := focusAndTrim(foregroundAudioPath)
 
-	defer os.Remove(trimmedPath)
+	defer os.Remove(trimmedForegroundAudioPath)
+
+	if err != nil {
+		return err
+	}
+
+	offset, score, _, err := locateAudio(backgroundAudioPath, trimmedForegroundAudioPath)
 
 	if score < MINIMUM_FINAL_MATCH_SCORE {
 		return tooLowScoreError
 	}
 
-	finalAudio, err := overwriteAudioSegment(trimmedPath, backgroundAudioPath, offset)
+	finalAudio, err := overwriteAudioSegment(trimmedForegroundAudioPath, backgroundAudioPath, offset)
 
 	defer os.Remove(finalAudio)
 
