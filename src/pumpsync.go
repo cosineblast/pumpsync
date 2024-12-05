@@ -8,6 +8,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+
+	"strconv"
+	"strings"
 )
 
 const phoenixStartPath = "./media/phoenix_start_of_music.wav"
@@ -190,6 +193,7 @@ func trimAndLocate(foregroundPath string, backgroundPath string) (string, float6
 		log.Println("file did not match with known delimiters")
 		log.Println("attempts:", focusFail.attempts)
 
+        os.Exit(1)
 		// TODO: trim audio from this audio nonetheless
 	} else {
 		log.Printf("file matched delimiter %s (%f, %f)!\n", match.Identifier, match.StartScore, match.EndScore)
@@ -216,6 +220,93 @@ func trimAndLocate(foregroundPath string, backgroundPath string) (string, float6
 	return finalForegroundPath, offset, score, nil
 }
 
+
+func getFileDuration(path string) (float64, error) {
+
+    logFile, err := os.CreateTemp("", "pumpsync_ffprobe_*.txt")
+    
+    if err != nil {
+        return 0, err
+    }
+
+	log.Printf("Getting duration of '%s'", path)
+
+	cmd := exec.Command("ffprobe", "-i", path, "-show_entries", "format=duration", "-of", "csv=p=0")
+
+	cmd.Stderr = logFile
+	stdout, err := cmd.Output()
+
+	if err != nil {
+		log.Println("failed to run ffprobe to get file duration")
+		return 0, err
+	}
+
+	result, err := strconv.ParseFloat(strings.TrimSpace(string(stdout)), 64)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return result, nil
+}
+
+func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset float64) (string, error) {
+
+    logFile, err := os.CreateTemp("", "pumpsync_ffprobe_*.txt")
+    
+    if err != nil {
+        return "", err
+    }
+
+	foregroundDuration, err := getFileDuration(foregroundPath)
+
+	if err != nil {
+		return "", err
+	}
+
+	outputFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_overwrite.wav")
+
+	if err != nil {
+		return "", err
+	}
+
+	outputPath := outputFile.Name()
+
+	outputFile.Close()
+
+	filterGraph := fmt.Sprintf(
+		`
+         [0:0]adelay=all=1:delays=%d[fg];
+         [1:0]volume=volume=0:enable='between(t,%f,%f)'[bg];
+         [bg][fg]amix=inputs=2:duration=longest[result]
+         `,
+		int(offset*1000.0),
+		offset,
+		offset+foregroundDuration,
+	)
+
+	cmd := exec.Command(
+		"ffmpeg",
+		"-y",              // don't ask for overwrite confirmation
+		"-filter_complex", // use the following filter graph
+		filterGraph,
+		"-i", foregroundPath, // read from this file as source 0
+		"-i", backgroundPath, // read from this file as source 1
+		"-map", "[result]", // use cable `result` to write to output
+        outputPath)
+
+	cmd.Stderr = logFile
+
+	err = cmd.Run()
+
+	if err != nil {
+		log.Println("failed to run overwite ffmpeg")
+		return "", nil
+	}
+
+	return outputPath, nil
+}
+
 func main() {
 	foregroundPath := flag.String("fg", "", "The path to the foreground audio file")
 	backgroundPath := flag.String("bg", "", "The path to the background audio file")
@@ -235,7 +326,16 @@ func main() {
 		os.Exit(1)
 	}
 
-    fmt.Println("path of foreground used in location: ", trimmedPath)
+	fmt.Println("Path of foreground used for cutting: ", trimmedPath)
 	fmt.Println("offset:", offset)
 	fmt.Println("score:", score)
+
+    finalWavPath, err := overwriteAudioSegment(trimmedPath, *backgroundPath, offset)
+
+	if err != nil {
+		log.Fatal("failed to overwrite audio segmnt: ", err)
+		os.Exit(1)
+	}
+
+    fmt.Println("result path:", finalWavPath)
 }
