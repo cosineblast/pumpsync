@@ -149,7 +149,16 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
 		"-t", fmt.Sprint(endOffset-startOffset), // and take this many seconds
 		"-i", path, // of this file
 		"-af", // and remove silence from start and end
-		"silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB:stop_periods=1:stop_duration=0:stop_threshold=-50dB",
+		`silenceremove=
+            start_periods=1
+            :start_duration=0
+            :start_threshold=-50dB
+        ,areverse
+        ,silenceremove=
+            start_periods=1
+            :start_duration=0
+            :start_threshold=-50dB
+        ,areverse`,
 		outputPath)
 
 	cmd.Stderr = logFile
