@@ -44,8 +44,8 @@ type AudioMatch = struct {
 }
 
 func locateAudio(haystackPath string, needlePath string) (float64, float64, float64, error) {
+    log.Println("running locate script")
 	cmd := exec.Command("./src/locate_audio.py", haystackPath, needlePath)
-    cmd.Stderr = os.Stderr
 
 	stdout, err := cmd.Output()
 
@@ -159,7 +159,7 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
         ,areverse`,
 		outputPath)
 
-    cmd.Stderr = os.Stderr
+    log.Println("running ffmpeg for silence removal and cut")
 	err = cmd.Run()
 
 	if err != nil {
@@ -219,7 +219,7 @@ func getFileDuration(path string) (float64, error) {
 	log.Printf("Getting duration of '%s'", path)
 
 	cmd := exec.Command("ffprobe", "-i", path, "-show_entries", "format=duration", "-of", "csv=p=0")
-    cmd.Stderr = os.Stderr
+    log.Println("running ffprobe")
 
 	stdout, err := cmd.Output()
 
@@ -275,7 +275,10 @@ func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset 
 		"-i", backgroundPath, // read from this file as source 1
 		"-map", "[result]", // use cable `result` to write to output
 		outputPath)
-    cmd.Stderr = os.Stderr
+
+    log.Println("running ffmpeg to overwrite bg audio with fg audio")
+    log.Println("offset: ", offset)
+    log.Println("fgduration", foregroundDuration)
 
 	err = cmd.Run()
 
@@ -302,7 +305,7 @@ func downloadYoutubeVideo(link string) (string, error) {
     cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]", 
     "--force-overwrites",
     "-o", outputPath)
-    cmd.Stderr = os.Stderr
+    log.Println("running yt-dlp")
 
 
 
@@ -330,7 +333,8 @@ func extractAudioFromVideo(videoPath string) (string, error) {
 		"-i", videoPath,
         "-ar", "48000",
 		audioFile.Name())
-    cmd.Stderr = os.Stderr
+
+    log.Println("running ffmpeg to convert video to audio")
 
 	err = cmd.Run()
 
@@ -355,7 +359,7 @@ func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) 
 		"-c", "copy",
 		resultPath)
 
-    cmd.Stderr = os.Stderr
+    log.Println("running ffmpeg to overwrite video audio")
 
 	err := cmd.Run()
 
