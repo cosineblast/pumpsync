@@ -45,6 +45,7 @@ type AudioMatch = struct {
 
 func locateAudio(haystackPath string, needlePath string) (float64, float64, float64, error) {
 	cmd := exec.Command("./src/locate_audio.py", haystackPath, needlePath)
+    cmd.Stderr = os.Stderr
 
 	stdout, err := cmd.Output()
 
@@ -72,6 +73,7 @@ func locateAudio(haystackPath string, needlePath string) (float64, float64, floa
 
 const AUDIO_START_MINIMUM_CONFIDENCE = 20
 const AUDIO_END_MINIMUM_CONFIDENCE = 15
+const MINIMUM_FINAL_MATCH_SCORE = 6
 
 func adjustCutOffset(startOffset float64, startDuration float64, endOffset float64) (float64, float64) {
 
@@ -128,13 +130,6 @@ func FocusAudio(path string) (*FocusSuccess, error) {
 
 func CutAudio(path string, startOffset float64, endOffset float64) (string, error) {
 
-	logFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_stderr.txt")
-	logFile.Close()
-
-	if err != nil {
-		return "", err
-	}
-
 	outputFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_cut.wav")
 
 	if err != nil {
@@ -164,8 +159,7 @@ func CutAudio(path string, startOffset float64, endOffset float64) (string, erro
         ,areverse`,
 		outputPath)
 
-	cmd.Stderr = logFile
-
+    cmd.Stderr = os.Stderr
 	err = cmd.Run()
 
 	if err != nil {
@@ -193,7 +187,7 @@ func trimAndLocate(foregroundPath string, backgroundPath string) (string, float6
 		log.Println("file did not match with known delimiters")
 		log.Println("attempts:", focusFail.attempts)
 
-        os.Exit(1)
+		os.Exit(1)
 		// TODO: trim audio from this audio nonetheless
 	} else {
 		log.Printf("file matched delimiter %s (%f, %f)!\n", match.Identifier, match.StartScore, match.EndScore)
@@ -220,20 +214,13 @@ func trimAndLocate(foregroundPath string, backgroundPath string) (string, float6
 	return finalForegroundPath, offset, score, nil
 }
 
-
 func getFileDuration(path string) (float64, error) {
-
-    logFile, err := os.CreateTemp("", "pumpsync_ffprobe_*.txt")
-    
-    if err != nil {
-        return 0, err
-    }
 
 	log.Printf("Getting duration of '%s'", path)
 
 	cmd := exec.Command("ffprobe", "-i", path, "-show_entries", "format=duration", "-of", "csv=p=0")
+    cmd.Stderr = os.Stderr
 
-	cmd.Stderr = logFile
 	stdout, err := cmd.Output()
 
 	if err != nil {
@@ -251,12 +238,6 @@ func getFileDuration(path string) (float64, error) {
 }
 
 func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset float64) (string, error) {
-
-    logFile, err := os.CreateTemp("", "pumpsync_ffprobe_*.txt")
-    
-    if err != nil {
-        return "", err
-    }
 
 	foregroundDuration, err := getFileDuration(foregroundPath)
 
@@ -293,9 +274,8 @@ func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset 
 		"-i", foregroundPath, // read from this file as source 0
 		"-i", backgroundPath, // read from this file as source 1
 		"-map", "[result]", // use cable `result` to write to output
-        outputPath)
-
-	cmd.Stderr = logFile
+		outputPath)
+    cmd.Stderr = os.Stderr
 
 	err = cmd.Run()
 
@@ -307,35 +287,137 @@ func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset 
 	return outputPath, nil
 }
 
+func downloadYoutubeVideo(link string) (string, error) {
+
+	outputFile, err := os.CreateTemp("", "pumpsync_*_yt_dlp.mp4")
+
+	if err != nil {
+		return "", err
+	}
+
+	outputPath := outputFile.Name()
+
+	outputFile.Close()
+
+    cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]", 
+    "--force-overwrites",
+    "-o", outputPath)
+    cmd.Stderr = os.Stderr
+
+
+
+	err = cmd.Run()
+
+	if err != nil {
+		return "", err
+	}
+
+	return outputPath, nil
+}
+
+func extractAudioFromVideo(videoPath string) (string, error) {
+
+	audioFile, err := os.CreateTemp("", "pumpsync_vid_*.wav")
+
+	if err != nil {
+		return "", err
+	}
+
+	audioFile.Close()
+
+	cmd := exec.Command("ffmpeg",
+        "-y",
+		"-i", videoPath,
+        "-ar", "48000",
+		audioFile.Name())
+    cmd.Stderr = os.Stderr
+
+	err = cmd.Run()
+
+	if err != nil {
+		return "", err
+	}
+
+	return audioFile.Name(), nil
+}
+
+var tooLowScoreError = errors.New("match score was too low to continue execution")
+
+func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) error {
+
+	cmd := exec.Command("ffmpeg",
+        "-y",
+		"-i", videoPath,
+		"-i", audioPath,
+		"-map", "0:v",
+		"-map", "1:0",
+		"-f", "mp4",
+		"-c", "copy",
+		resultPath)
+
+    cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func improveVideoQualityFromYoutube(backgroundVideoPath string, youtubeLink string, outputFilePath string) error {
+
+	foregroundVideoPath, err := downloadYoutubeVideo(youtubeLink)
+
+	if err != nil {
+		return err
+	}
+
+	defer os.Remove(foregroundVideoPath)
+
+	backgroundAudioPath, err := extractAudioFromVideo(backgroundVideoPath)
+
+	if err != nil {
+		return err
+	}
+
+	foregroundAudioPath, err := extractAudioFromVideo(foregroundVideoPath)
+
+	if err != nil {
+		return err
+	}
+
+	trimmedPath, offset, score, err := trimAndLocate(foregroundAudioPath, backgroundAudioPath)
+
+	if score < MINIMUM_FINAL_MATCH_SCORE {
+		return tooLowScoreError
+	}
+
+	finalAudio, err := overwriteAudioSegment(trimmedPath, backgroundAudioPath, offset)
+
+	overwriteVideoAudio(backgroundVideoPath, finalAudio, outputFilePath)
+
+	return nil
+}
+
 func main() {
-	foregroundPath := flag.String("fg", "", "The path to the foreground audio file")
-	backgroundPath := flag.String("bg", "", "The path to the background audio file")
+	link := flag.String("link", "", "The link to the youtube video")
+	backgroundPath := flag.String("bg", "", "The path to the background video")
+	outputpath := flag.String("o", "", "The location to write the modified background video")
 
 	flag.Parse()
 
-	if *foregroundPath == "" || *backgroundPath == "" {
+	if *link == "" || *backgroundPath == "" {
 		log.Println("error: missing flags")
 		// TODO: use cli arg lib
 		os.Exit(1)
 	}
 
-	trimmedPath, offset, score, err := trimAndLocate(*foregroundPath, *backgroundPath)
+    err := improveVideoQualityFromYoutube(*backgroundPath, *link, *outputpath)
 
-	if err != nil {
-		log.Println("error: failed to locate fg in bg", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("Path of foreground used for cutting: ", trimmedPath)
-	fmt.Println("offset:", offset)
-	fmt.Println("score:", score)
-
-    finalWavPath, err := overwriteAudioSegment(trimmedPath, *backgroundPath, offset)
-
-	if err != nil {
-		log.Fatal("failed to overwrite audio segmnt: ", err)
-		os.Exit(1)
-	}
-
-    fmt.Println("result path:", finalWavPath)
+    if err != nil {
+        log.Fatal(err)
+        os.Exit(1)
+    }
 }
