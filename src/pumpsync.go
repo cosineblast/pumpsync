@@ -495,7 +495,7 @@ func improveVideoQualityFromYoutube(backgroundVideoPath string, youtubeLink stri
 
 func main() {
     cmd := &cli.Command{
-        Name: "audio",
+        Name: "pumpsync",
         Flags: []cli.Flag{
             &cli.StringFlag{
                 Name:  "background",
