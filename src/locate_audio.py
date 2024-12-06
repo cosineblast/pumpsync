@@ -32,7 +32,7 @@ def locate_audio(haystack, needle):
     # that the audio starts somewhere impossible
     # in that case, the right thing to do is to claim that we have absolutely
     # no confidence on the result
-    if audio_start < 0:
+    if audio_start < 0 or audio_start >= len(haystack):
         return (0, 0)
 
     return (audio_start, float(z_score))
