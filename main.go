@@ -8,14 +8,11 @@ import (
 	"os"
 	"os/exec"
 
-    "github.com/urfave/cli/v3"
-    "context"
+	"context"
+	"github.com/urfave/cli/v3"
 	"strconv"
 	"strings"
 )
-
-const phoenixStartPath = "./res/phoenix_start_of_music.wav"
-const phoenixEndPath = "./res/phoenix_end_of_music.wav"
 
 type FocusSuccess struct {
 	LeftCut    float64
@@ -45,7 +42,7 @@ type AudioMatch = struct {
 }
 
 func locateAudio(haystackPath string, needlePath string) (float64, float64, float64, error) {
-    log.Println("running locate script")
+	log.Println("running locate script")
 	cmd := exec.Command("./src/py/locate_audio.py", haystackPath, needlePath)
 
 	stdout, err := cmd.Output()
@@ -110,7 +107,7 @@ func focusAudio(path string) (*FocusSuccess, error) {
 			return nil, err
 		}
 
-        log.Println("checking if audio matches ", entry.key)
+		log.Println("checking if audio matches ", entry.key)
 
 		endOffset, endScore, _, err := locateAudio(path, entry.endPath)
 
@@ -138,11 +135,11 @@ func trimAudioSilence(path string) (string, error) {
 		return "", err
 	}
 
-    defer func() {
-        if err != nil {
-            os.Remove(outputFile.Name())
-        }
-    }()
+	defer func() {
+		if err != nil {
+			os.Remove(outputFile.Name())
+		}
+	}()
 
 	outputFile.Close()
 
@@ -152,7 +149,7 @@ func trimAudioSilence(path string) (string, error) {
 		"ffmpeg",
 		"-y",       // don't ask for overwrite confirmation
 		"-i", path, // read from this file as input 0
-		"-af",      // and remove silence from start and end
+		"-af", // and remove silence from start and end
 		`silenceremove=
             start_periods=1
             :start_duration=0
@@ -165,7 +162,7 @@ func trimAudioSilence(path string) (string, error) {
         ,areverse`,
 		outputPath)
 
-    log.Println("running ffmpeg for silence removal")
+	log.Println("running ffmpeg for silence removal")
 	err = cmd.Run()
 
 	if err != nil {
@@ -183,12 +180,11 @@ func cutAudio(path string, startOffset float64, endOffset float64) (string, erro
 		return "", err
 	}
 
-    defer func() {
-        if err != nil {
-            os.Remove(outputFile.Name())
-        }
-    }()
-
+	defer func() {
+		if err != nil {
+			os.Remove(outputFile.Name())
+		}
+	}()
 
 	outputPath := outputFile.Name()
 
@@ -199,10 +195,10 @@ func cutAudio(path string, startOffset float64, endOffset float64) (string, erro
 		"-y",                           // don't ask for overwrite confirmation
 		"-ss", fmt.Sprint(startOffset), // seek to this offset
 		"-t", fmt.Sprint(endOffset-startOffset), // and take this many seconds
-		"-i", path,                              // of this file
+		"-i", path, // of this file
 		outputPath)
 
-    log.Println("running ffmpeg for cut")
+	log.Println("running ffmpeg for cut")
 	err = cmd.Run()
 
 	if err != nil {
@@ -234,7 +230,7 @@ func focusAndTrim(foregroundPath string) (string, error) {
 			return "", err
 		}
 
-        return result, nil
+		return result, nil
 
 	} else {
 		log.Printf("file matched delimiter %s (%f, %f)!\n", match.Identifier, match.StartScore, match.EndScore)
@@ -247,19 +243,19 @@ func focusAndTrim(foregroundPath string) (string, error) {
 			return "", err
 		}
 
-        defer func() {
-            if err != nil {
-                os.Remove(cutted)
-            }
-        }()
+		defer func() {
+			if err != nil {
+				os.Remove(cutted)
+			}
+		}()
 
-        trimmed, err := trimAudioSilence(cutted)
+		trimmed, err := trimAudioSilence(cutted)
 
 		if err != nil {
 			return "", err
 		}
 
-        return trimmed, err
+		return trimmed, err
 	}
 }
 
@@ -268,7 +264,7 @@ func getFileDuration(path string) (float64, error) {
 	log.Printf("Getting duration of '%s'", path)
 
 	cmd := exec.Command("ffprobe", "-i", path, "-show_entries", "format=duration", "-of", "csv=p=0")
-    log.Println("running ffprobe")
+	log.Println("running ffprobe")
 
 	stdout, err := cmd.Output()
 
@@ -300,12 +296,11 @@ func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset 
 		return "", err
 	}
 
-    defer func() {
-        if err != nil {
-            os.Remove(outputFile.Name())
-        }
-    }()
-
+	defer func() {
+		if err != nil {
+			os.Remove(outputFile.Name())
+		}
+	}()
 
 	outputPath := outputFile.Name()
 
@@ -332,9 +327,9 @@ func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset 
 		"-map", "[result]", // use cable `result` to write to output
 		outputPath)
 
-    log.Println("running ffmpeg to overwrite bg audio with fg audio")
-    log.Println("offset: ", offset)
-    log.Println("fgduration", foregroundDuration)
+	log.Println("running ffmpeg to overwrite bg audio with fg audio")
+	log.Println("offset: ", offset)
+	log.Println("fgduration", foregroundDuration)
 
 	err = cmd.Run()
 
@@ -354,23 +349,20 @@ func downloadYoutubeVideo(link string) (string, error) {
 		return "", err
 	}
 
-    defer func() {
-        if err != nil {
-            os.Remove(outputFile.Name())
-        }
-    }()
+	defer func() {
+		if err != nil {
+			os.Remove(outputFile.Name())
+		}
+	}()
 
 	outputFile.Close()
 
 	outputPath := outputFile.Name()
 
-
-    cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]",
-    "--force-overwrites",
-    "-o", outputPath)
-    log.Println("running yt-dlp")
-
-
+	cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]",
+		"--force-overwrites",
+		"-o", outputPath)
+	log.Println("running yt-dlp")
 
 	err = cmd.Run()
 
@@ -389,22 +381,21 @@ func extractAudioFromVideo(videoPath string) (string, error) {
 		return "", err
 	}
 
-    defer func() {
-        if err != nil {
-            os.Remove(audioFile.Name())
-        }
-    }()
-
+	defer func() {
+		if err != nil {
+			os.Remove(audioFile.Name())
+		}
+	}()
 
 	audioFile.Close()
 
 	cmd := exec.Command("ffmpeg",
-        "-y",
+		"-y",
 		"-i", videoPath,
-        "-ar", "48000",
+		"-ar", "48000",
 		audioFile.Name())
 
-    log.Println("running ffmpeg to convert video to audio")
+	log.Println("running ffmpeg to convert video to audio")
 
 	err = cmd.Run()
 
@@ -420,7 +411,7 @@ var tooLowScoreError = errors.New("match score was too low to continue execution
 func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) error {
 
 	cmd := exec.Command("ffmpeg",
-        "-y",
+		"-y",
 		"-i", videoPath,
 		"-i", audioPath,
 		"-map", "0:v",
@@ -429,7 +420,7 @@ func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) 
 		"-c", "copy",
 		resultPath)
 
-    log.Println("running ffmpeg to overwrite video audio")
+	log.Println("running ffmpeg to overwrite video audio")
 
 	err := cmd.Run()
 
@@ -486,60 +477,60 @@ func improveVideoQualityFromYoutube(backgroundVideoPath string, youtubeLink stri
 
 	err = overwriteVideoAudio(backgroundVideoPath, finalAudio, outputFilePath)
 
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func main() {
-    cmd := &cli.Command{
-        Name: "pumpsync",
-        Flags: []cli.Flag{
-            &cli.StringFlag{
-                Name:  "background",
-                Aliases:     []string{"bg"},
-                Usage: "Path to the video containing the gameplay",
-                Required: true,
-            },
+	cmd := &cli.Command{
+		Name: "pumpsync",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "background",
+				Aliases:  []string{"bg"},
+				Usage:    "Path to the video containing the gameplay",
+				Required: true,
+			},
 
-            &cli.StringFlag{
-                Name: "link",
-                Aliases:     []string{"l"},
-                Usage: "Link to youtube video with the high-quality recording of music you want to overwite with",
-                Required: true,
-            },
+			&cli.StringFlag{
+				Name:     "link",
+				Aliases:  []string{"l"},
+				Usage:    "Link to youtube video with the high-quality recording of music you want to overwite with",
+				Required: true,
+			},
 
-            &cli.StringFlag{
-                Name: "output",
-                Aliases:     []string{"o"},
-                Usage: "The location to write the modified background video",
-                Required: true,
-            },
-        },
+			&cli.StringFlag{
+				Name:     "output",
+				Aliases:  []string{"o"},
+				Usage:    "The location to write the modified background video",
+				Required: true,
+			},
+		},
 
-        Usage: "Overwite audio of an video with music from youtube",
+		Usage: "Overwite audio of an video with music from youtube",
 
-        Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 
-            link := cmd.String("link")
-            backgroundPath := cmd.String("background")
-            outputpath := cmd.String("output")
+			link := cmd.String("link")
+			backgroundPath := cmd.String("background")
+			outputpath := cmd.String("output")
 
-            err := improveVideoQualityFromYoutube(backgroundPath, link, outputpath)
+			err := improveVideoQualityFromYoutube(backgroundPath, link, outputpath)
 
-            if err != nil {
-                log.Fatal(err)
-                os.Exit(1)
-            }
+			if err != nil {
+				log.Fatal(err)
+				os.Exit(1)
+			}
 
-            return nil
-        },
-    }
+			return nil
+		},
+	}
 
-    if err := cmd.Run(context.Background(), os.Args); err != nil {
-        log.Fatal(err)
-        os.Exit(1)
-    }
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
 }
