@@ -14,8 +14,8 @@ import (
 	"strings"
 )
 
-const phoenixStartPath = "./media/phoenix_start_of_music.wav"
-const phoenixEndPath = "./media/phoenix_end_of_music.wav"
+const phoenixStartPath = "./res/phoenix_start_of_music.wav"
+const phoenixEndPath = "./res/phoenix_end_of_music.wav"
 
 type FocusSuccess struct {
 	LeftCut    float64
@@ -96,8 +96,8 @@ func focusAudio(path string) (*FocusSuccess, error) {
 		startPath string
 		endPath   string
 	}{
-		{"XX", "./media/xx_start_of_music.wav", "./media/xx_end_of_music.wav"},
-		{"Phoenix", "./media/phoenix_start_of_music.wav", "./media/phoenix_end_of_music.wav"},
+		{"XX", "./res/xx_start_of_music.wav", "./res/xx_end_of_music.wav"},
+		{"Phoenix", "./res/phoenix_start_of_music.wav", "./res/phoenix_end_of_music.wav"},
 	}
 
 	attempts := make(map[string]FloatPair)
