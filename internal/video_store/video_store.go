@@ -1,74 +1,72 @@
-
 package video_store
 
 import (
-    "github.com/google/uuid"
-    "os"
-    "time"
+	"github.com/google/uuid"
+	"os"
 	"sync"
+	"time"
 )
 
 type VideoStore struct {
-    availableVideos sync.Map
+	availableVideos sync.Map
 }
 
 func NewVideoStore() VideoStore {
-    return VideoStore{}
+	return VideoStore{}
 }
 
 func (store *VideoStore) FetchVideo(id uuid.UUID) *string {
-    value, ok := store.availableVideos.Load(id)
+	value, ok := store.availableVideos.Load(id)
 
-    if !ok {
-        return nil
-    }
+	if !ok {
+		return nil
+	}
 
-    result := new(string)
-    *result = value.(string)
-    return result
+	result := new(string)
+	*result = value.(string)
+	return result
 }
 
-
-// Moves the file in the given file to the video store 
+// Moves the file in the given file to the video store
 // the file will be automatically removed from the store after 5 minutes.
 func (store *VideoStore) AddVideo(path string) (uuid.UUID, error) {
 
-    var err error
+	var err error
 
-    defer func() {
-        if err != nil {
-            os.Remove(path)
-        }
-    }()
+	defer func() {
+		if err != nil {
+			os.Remove(path)
+		}
+	}()
 
-    uid, err := uuid.NewRandom()
+	uid, err := uuid.NewRandom()
 
-    if err != nil {
-        return uuid.UUID{}, err
-    }
+	if err != nil {
+		return uuid.UUID{}, err
+	}
 
-    file, err := os.CreateTemp("", "pumsync_result_*.mp4")
+	file, err := os.CreateTemp("", "pumsync_result_*.mp4")
 
-    if err != nil {
-        return uuid.UUID{}, err
-    }
+	if err != nil {
+		return uuid.UUID{}, err
+	}
 
-    file.Close()
+	file.Close()
 
-    err = os.Rename(path, file.Name())
+	err = os.Rename(path, file.Name())
 
-    if err != nil {
-        return uuid.UUID{}, err
-    }
+	if err != nil {
+		return uuid.UUID{}, err
+	}
 
-    store.availableVideos.Store(uid, file.Name())
+	store.availableVideos.Store(uid, file.Name())
 
-    go func() {
-        time.Sleep(time.Duration(5 * time.Minute))
+	go func() {
+		time.Sleep(time.Duration(5 * time.Minute))
 
-        store.availableVideos.Delete(uid)
-        os.Remove(file.Name())
-    }()
+		store.availableVideos.Delete(uid)
+		os.Remove(file.Name())
+	}()
 
-    return uid, nil
+	return uid, nil
 }

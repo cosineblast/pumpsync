@@ -1,4 +1,4 @@
-module the_thing
+module github.com/cosineblast/pumpsync
 
 go 1.23.3
 
