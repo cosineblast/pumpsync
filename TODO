@@ -1,0 +1,41 @@
+Organization:
+- Refactor main.go structure
+  - Check a real echo application for reference on organization
+  - Move things to separate files
+  - Add request state struct
+
+- Setup proper slog logging
+- Understand why echo prints json in command line logging
+- Log execution of programs to temporary files (based on debug environment variable)
+
+- Move cli to separate project (or remove it altogether)
+
+Documentation:
+
+- Document websocket protocol
+- Link to frontend repo's on backend's README.md
+- Document frontend README.md
+
+Structure:
+- Implement work queue
+- Implement youtube video cache
+- Increase frontend margin top and max-width a little bit
+
+Robustness:
+- Check if given youtube link is actually a watch? link in backend, and extract watch part
+  for yt-dlp
+- Check length of youtube video before trying to download it
+- Reject non watch? videos on frontend
+- Check if video is mp4 before running
+- Cache youtube videos locally
+- Show error messages/status to user in frontend
+- Apply CORS in general
+- Apply CORS in WebSocket requests
+
+Nice to have:
+- Replace python locate script with pure go implementation
+
+Features:
+- Add rating feature, so users can rate the results they got
+- Add
+- Implement frontend reporting of errors when the backend fails
