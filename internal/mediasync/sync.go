@@ -1,4 +1,3 @@
-
 package mediasync
 
 import (
@@ -359,7 +358,10 @@ func downloadYoutubeVideo(link string) (string, error) {
 
 	cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]",
 		"--force-overwrites",
+		"--max-filesize", "512M",
+		"--no-playlist",
 		"-o", outputPath)
+
 	log.Println("running yt-dlp")
 
 	err = cmd.Run()
@@ -473,21 +475,21 @@ func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error
 
 	defer os.Remove(finalAudio)
 
-    outputFile, err := os.CreateTemp("", "pumpsync_result_*.mp4")
+	outputFile, err := os.CreateTemp("", "pumpsync_result_*.mp4")
 
-    if err != nil {
-        return "", err
-    }
+	if err != nil {
+		return "", err
+	}
 
-    outputFilePath := outputFile.Name()
+	outputFilePath := outputFile.Name()
 
-    outputFile.Close()
+	outputFile.Close()
 
-    defer func() {
-        if err != nil {
-            os.Remove(outputFilePath)
-        }
-    }()
+	defer func() {
+		if err != nil {
+			os.Remove(outputFilePath)
+		}
+	}()
 
 	err = overwriteVideoAudio(backgroundVideoPath, finalAudio, outputFilePath)
 
@@ -497,4 +499,3 @@ func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error
 
 	return outputFilePath, nil
 }
-
