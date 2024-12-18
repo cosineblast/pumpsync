@@ -20,11 +20,10 @@ The source for the frontend can be found at [pumpsync_front](https://github.com/
 
 TODO
 
-## Building this
-
-TODO
 
 ## Running this
+
+A `Dockerfile` is also provided for deployment.
 
 The json API endpoints are documented in (TODO).
 The websocket API endpoints are documented in (TODO).
@@ -37,9 +36,15 @@ The executable will use the following environment variables:
 | PUMPSYNC_PORT | 8000 | The port the server will listen on |
 | PUMPSYNC_URL_PREFIX | http://127.0.0.1:8000 | The prefix of the URLs this server will use when generating links to itself to use in request outputs (e.g video download links) |
 
-A `Dockerfile` is also provided for deployment.
+## Developing this
+
+This project uses [devbox](https://github.com/jetify-com/devbox), so you can load all the development dependencies by running `devbox shell`.
+Then, to build and run, `go run .`
+
+The program also reads environment variables from `.env` by default.
 
 ## How it works
+
 
 TODO
 

@@ -5,4 +5,7 @@ __pycache__
 *.wav
 !res/*
 env
+.venv
 .env
+.devbox
+docker-compose.yaml
