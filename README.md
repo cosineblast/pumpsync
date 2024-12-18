@@ -13,49 +13,37 @@ make it easier to follow the movements of the gameplay, this can be a tedious ta
 
 These are some of the hurdles `pumpsync` aims to help with.
 
-## Using it 
+This repository contains the backend code for the pumpsync website.
+The source for the frontend can be found at [pumpsync_front](https://github.com/cosineblast/pumpsync_front).
 
-Currently, `pumpsync` is just a simple CLI program, which will be expanded to a website in a near future.
-It supports overwriting the music audio of a pump it up gameplay video with the audio of an youtube gameplay recording:
+## What it does
 
-``` 
-./pumpsync \
-    --bg media/papasito_bg.mp4 \
-    --link "https://www.youtube.com/watch?v=SqtyWdTB_9k" \
-    -o papasito_modified.mp4
-```
+TODO
 
-This command will read a noisy gameplay video from `papasito_bg.mp4`, download the audio from the chart video in the given youtube link, 
-and create a new video file named `papasito_modified.mp4`, containing an edit of the original video, the music properly
-overwritten at the correct timing. 
+## Building this
 
-`pumpsync` is aware that some youtube videos have an intro and an outro, for things such as music selection and score screen, 
-and is able to automatically trim those out for videos which have an XX or Phoenix intro/outro.
+TODO
 
-### Building it
+## Running this
 
-To run this project, you will need the following dependencies (last tested version in parenthesis):
+The json API endpoints are documented in (TODO).
+The websocket API endpoints are documented in (TODO).
 
-- `yt-dlp` (2024.11.18)
-- `golang` (1.23)
-- `python3` (3.12)
-- `ffmepg` (7.1)
+The executable will use the following environment variables:
 
-Additionally, you will need the python dependencies in the `requirements.txt` file, which can be installed with `pip install -r requirements.txt`.
+| Name | Default Value | Description |
+|---|---|---|
+| PUMPSYNC_HOST | `[::]` | The host this server will listen on |
+| PUMPSYNC_PORT | 8000 | The port the server will listen on |
+| PUMPSYNC_URL_PREFIX | http://127.0.0.1:8000 | The prefix of the URLs this server will use when generating links to itself to use in request outputs (e.g video download links) |
 
-The project can be ran with `go run .`, or a binary can be produced with `go build .` and ran with `./pumpsync`.
-
-This will be expanded in the future, and the python dependencies will probably get replaced by pure Go packages.
-
-In order to run, the project needs the resource files located in the `res` directory.
+A `Dockerfile` is also provided for deployment.
 
 ## How it works
 
-TODO: Document this.
+TODO
 
 ## Plans
 
 - Implement video overlay
 - Replace python locate implementation with pure go implementations (or FFTw)
-- Package with nix
-- Make a website for this
