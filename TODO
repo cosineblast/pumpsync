@@ -1,13 +1,7 @@
 Organization:
-- Refactor main.go structure
-  - Move things to separate files
-  - Add request state struct
+- Add request state struct
 
-- Setup proper slog logging
-- Understand why echo prints json in command line logging
 - Log execution of programs to temporary files (based on debug environment variable)
-
-- Move cli to separate project (or remove it altogether)
 
 Documentation:
 - Document websocket protocol
@@ -34,5 +28,6 @@ Nice to have:
 - Replace python locate script with pure go implementation
 
 Features:
+- Add about page
 - Add rating feature, so users can rate the results they got
 - Add video overlay support
