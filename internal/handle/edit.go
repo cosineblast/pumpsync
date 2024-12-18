@@ -196,6 +196,16 @@ func validateVideoId(id string) error {
 	return nil
 }
 
+func getUrlPrefix() string {
+    prefix := os.Getenv("PUMPSYNC_URL_PREFIX")
+
+    if prefix == "" {
+        prefix = "http://127.0.0.1:8000"
+    }
+
+    return prefix
+}
+
 func notifySuccess(store *video_store.VideoStore, ws *websocket.Conn, resultPath string) error {
 
 	uuid, err := store.AddVideo(resultPath)
@@ -204,7 +214,9 @@ func notifySuccess(store *video_store.VideoStore, ws *websocket.Conn, resultPath
 		return err
 	}
 
-	url := fmt.Sprintf("http://127.0.0.1:1323/api/video/%s", uuid.String())
+    prefix := getUrlPrefix()
+
+	url := fmt.Sprintf("%s/api/video/%s", prefix, uuid.String())
 
 	err = ws.WriteJSON(doneStatus(url))
 
