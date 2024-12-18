@@ -31,11 +31,17 @@ func main() {
 
 	e.GET("/api/video/:id", func(c echo.Context) error { return handle.HandleVideoDownloadRequest(&store, c) })
 
+    startServer(e)
+}
+
+func startServer(e *echo.Echo) {
+    host := os.Getenv("PUMPSYNC_HOST")
+
     port := os.Getenv("PUMPSYNC_PORT")
 
     if port == "" {
         port = "8000"
     }
 
-    e.Logger.Fatal(e.Start(":" + port))
+    e.Logger.Fatal(e.Start(host + ":" + port))
 }
