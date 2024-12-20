@@ -1,11 +1,8 @@
 Organization:
 - Add request state struct
 
-- Log execution of programs to temporary files (based on debug environment variable)
-
 Documentation:
 - Document websocket protocol
-- Link to frontend repo's on backend's README.md
 - Document frontend README.md
 
 UI:
@@ -17,6 +14,7 @@ Structure:
 
 Scale:
 - Cache youtube videos locally
+- Select better yt-dlp flags
 
 Robustness:
 - Check length of youtube video before trying to download it
