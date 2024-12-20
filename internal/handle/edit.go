@@ -64,30 +64,23 @@ type ProcessingRequest struct {
 
 type StatusMessage struct {
 	Status    string  `json:"status"` // ok || error | done
-	ErrorName *string `json:"error"`
+	ErrorTag *string `json:"error"`
 	ResultId  *string `json:"result_id"`
 }
 
-func okStatus() StatusMessage {
-	return StatusMessage{Status: "ok", ErrorName: nil, ResultId: nil}
+func okMessage() StatusMessage {
+	return StatusMessage{Status: "ok", ErrorTag: nil, ResultId: nil}
 }
 
-func doneStatus(id string) StatusMessage {
-	return StatusMessage{Status: "done", ErrorName: nil, ResultId: &id}
+func doneMessage(id string) StatusMessage {
+	return StatusMessage{Status: "done", ErrorTag: nil, ResultId: &id}
 }
 
-func errorStatus(errorName string) StatusMessage {
-	return StatusMessage{Status: "error", ErrorName: &errorName}
+func errorMessage(err *responseError) StatusMessage {
+	return StatusMessage{Status: "error", ErrorTag: &err.tag}
 }
 
 const maxFileSize = 1024 * 1024 * 500
-
-var fileTooBig = errors.New("file_too_big")
-var parseError = errors.New("parse_error")
-var negativeFileSize = errors.New("negative_size")
-var protocolViolation = errors.New("protocol_violation")
-var serverError = errors.New("server_error")
-var editFailed = errors.New("edit_failed")
 
 func HandleEditRequest(store *video_store.VideoStore, c echo.Context) error {
 
@@ -106,14 +99,12 @@ func HandleEditRequest(store *video_store.VideoStore, c echo.Context) error {
 
 	if err = ws.ReadJSON(&request); err != nil {
 		c.Logger().Error("failed to read json info from websocket", err)
-		ws.WriteJSON(errorStatus(parseError.Error()))
+		ws.WriteJSON(errorMessage(parseError))
 		return nil
 	}
 
-	err = validateRequest(&request)
-
-	if err != nil {
-		ws.WriteJSON(errorStatus(err.Error()))
+	if resErr := validateRequest(&request); resErr != nil {
+		ws.WriteJSON(errorMessage(resErr))
 		return nil
 	}
 
@@ -126,7 +117,7 @@ func HandleEditRequest(store *video_store.VideoStore, c echo.Context) error {
 
 	if messageType != websocket.BinaryMessage {
 		c.Logger().Error("expected binary message")
-		ws.WriteJSON(errorStatus(protocolViolation.Error()))
+		ws.WriteJSON(errorMessage(protocolViolation))
 		return nil
 	}
 
@@ -135,29 +126,46 @@ func HandleEditRequest(store *video_store.VideoStore, c echo.Context) error {
 
 	c.Logger().Debug("alright! file", savedFile, "saved to disk with size", request.FileSize)
 
-	if err = ws.WriteJSON(okStatus()); err != nil {
+	if err = ws.WriteJSON(okMessage()); err != nil {
 		c.Logger().Error("failed write ok status message", err)
 		return nil
 	}
 
 	youtubeUrl := fmt.Sprintf("http://youtube.com/watch?v=%s", request.VideoId)
 
-	result, err := mediasync.ImproveAudio(savedFile, youtubeUrl)
-
-	if err != nil {
-		c.Logger().Error("video edit failed", err)
-		ws.WriteJSON(errorStatus(editFailed.Error()))
-		return nil
-	}
-
 	c.Logger().Info("video edited with sucess")
+
+    result, responseErr := tryEditVideo(savedFile, youtubeUrl)
+
+    if responseErr != nil {
+        ws.WriteJSON(errorMessage(responseErr))
+    }
 
 	notifySuccess(store, ws, result)
 
 	return nil
 }
 
-func validateRequest(request *ProcessingRequest) error {
+// edits the video with the given request and file, and returns 
+// an apropiate response error if it fails
+func tryEditVideo(savedFile string, youtubeUrl string) (string, *responseError) {
+
+	result, err := mediasync.ImproveAudio(savedFile, youtubeUrl)
+
+	if err != nil {
+		slog.Error("video edit failed", "err", err)
+
+        if errors.Is(err, mediasync.TooLowScoreError) {
+            return "", editLocateFailed
+        } else {
+            return "", editFailed
+        }
+	}
+
+    return result, nil
+}
+
+func validateRequest(request *ProcessingRequest) *responseError {
 
 	if request.FileSize < 0 {
 		slog.Error("request had negative file size")
@@ -177,7 +185,7 @@ func validateRequest(request *ProcessingRequest) error {
 	return validateVideoId(request.VideoId)
 }
 
-func validateVideoId(id string) error {
+func validateVideoId(id string) *responseError {
 
 	validIdRegex := "^[a-zA-Z0-9\\-\\_]+$"
 
@@ -218,7 +226,7 @@ func notifySuccess(store *video_store.VideoStore, ws *websocket.Conn, resultPath
 
 	url := fmt.Sprintf("%s/api/video/%s", prefix, uuid.String())
 
-	err = ws.WriteJSON(doneStatus(url))
+	err = ws.WriteJSON(doneMessage(url))
 
 	if err != nil {
 		return err
