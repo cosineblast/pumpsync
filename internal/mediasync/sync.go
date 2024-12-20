@@ -32,7 +32,7 @@ func (f FocusFail) Error() string {
 	return "Failed to find sample in file"
 }
 
-type AudioMatch = struct {
+type audioMatch = struct {
 	Offset         float64 `json:"offset"`
 	Score          float64 `json:"score"`
 	NeedleDuration float64 `json:"needle_duration"`
@@ -40,7 +40,7 @@ type AudioMatch = struct {
 
 func locateAudio(haystackPath string, needlePath string) (float64, float64, float64, error) {
 	log.Println("running locate script")
-	cmd := exec.Command("./internal/py/locate_audio.py", haystackPath, needlePath)
+	cmd := newCommand("./internal/py/locate_audio.py", haystackPath, needlePath)
 
 	stdout, err := cmd.Output()
 
@@ -52,7 +52,7 @@ func locateAudio(haystackPath string, needlePath string) (float64, float64, floa
 		return 0, 0, 0, err
 	}
 
-	var message AudioMatch
+	var message audioMatch
 	message.Offset = 0
 	message.Score = 0
 	message.NeedleDuration = 0
@@ -125,6 +125,16 @@ func focusAudio(path string) (*FocusSuccess, error) {
 
 }
 
+func newCommand(name string, commands ...string) *exec.Cmd {
+    result := exec.Command(name, commands...)
+
+    if os.Getenv("PUMPSYNC_DEBUG") == "1" {
+        result.Stderr = os.Stderr
+    }
+
+    return result
+}
+
 func trimAudioSilence(path string) (string, error) {
 	outputFile, err := os.CreateTemp("", "pumpsync_*_ffmpeg_trim.wav")
 
@@ -142,7 +152,7 @@ func trimAudioSilence(path string) (string, error) {
 
 	outputPath := outputFile.Name()
 
-	cmd := exec.Command(
+	cmd := newCommand(
 		"ffmpeg",
 		"-y",       // don't ask for overwrite confirmation
 		"-i", path, // read from this file as input 0
@@ -187,7 +197,7 @@ func cutAudio(path string, startOffset float64, endOffset float64) (string, erro
 
 	outputFile.Close()
 
-	cmd := exec.Command(
+	cmd := newCommand(
 		"ffmpeg",
 		"-y",                           // don't ask for overwrite confirmation
 		"-ss", fmt.Sprint(startOffset), // seek to this offset
@@ -205,7 +215,7 @@ func cutAudio(path string, startOffset float64, endOffset float64) (string, erro
 	return outputPath, nil
 }
 
-func focusAndTrim(foregroundPath string) (string, error) {
+func focusAndTrimPumpAudio(foregroundPath string) (string, error) {
 
 	log.Println("Checking if foreground audio needs a cut...")
 
@@ -260,7 +270,7 @@ func getFileDuration(path string) (float64, error) {
 
 	log.Printf("Getting duration of '%s'", path)
 
-	cmd := exec.Command("ffprobe", "-i", path, "-show_entries", "format=duration", "-of", "csv=p=0")
+	cmd := newCommand("ffprobe", "-i", path, "-show_entries", "format=duration", "-of", "csv=p=0")
 	log.Println("running ffprobe")
 
 	stdout, err := cmd.Output()
@@ -314,7 +324,7 @@ func overwriteAudioSegment(foregroundPath string, backgroundPath string, offset 
 		offset+foregroundDuration,
 	)
 
-	cmd := exec.Command(
+	cmd := newCommand(
 		"ffmpeg",
 		"-y",              // don't ask for overwrite confirmation
 		"-filter_complex", // use the following filter graph
@@ -356,7 +366,7 @@ func downloadYoutubeVideo(link string) (string, error) {
 
 	outputPath := outputFile.Name()
 
-	cmd := exec.Command("yt-dlp", link, "-f", "best[ext=mp4]",
+	cmd := newCommand("yt-dlp", link, "-f", "mp4",
 		"--force-overwrites",
 		"--max-filesize", "512M",
 		"--no-playlist",
@@ -389,7 +399,7 @@ func extractAudioFromVideo(videoPath string) (string, error) {
 
 	audioFile.Close()
 
-	cmd := exec.Command("ffmpeg",
+	cmd := newCommand("ffmpeg",
 		"-y",
 		"-i", videoPath,
 		"-ar", "48000",
@@ -406,11 +416,11 @@ func extractAudioFromVideo(videoPath string) (string, error) {
 	return audioFile.Name(), nil
 }
 
-var tooLowScoreError = errors.New("match score was too low to continue execution")
+var TooLowScoreError = errors.New("match score was too low to continue execution")
 
 func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) error {
 
-	cmd := exec.Command("ffmpeg",
+	cmd := newCommand("ffmpeg",
 		"-y",
 		"-i", videoPath,
 		"-i", audioPath,
@@ -457,7 +467,7 @@ func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error
 		return "", err
 	}
 
-	trimmedForegroundAudioPath, err := focusAndTrim(foregroundAudioPath)
+	trimmedForegroundAudioPath, err := focusAndTrimPumpAudio(foregroundAudioPath)
 
 	defer os.Remove(trimmedForegroundAudioPath)
 
@@ -468,7 +478,7 @@ func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error
 	offset, score, _, err := locateAudio(backgroundAudioPath, trimmedForegroundAudioPath)
 
 	if score < MINIMUM_FINAL_MATCH_SCORE {
-		return "", tooLowScoreError
+		return "", TooLowScoreError
 	}
 
 	finalAudio, err := overwriteAudioSegment(trimmedForegroundAudioPath, backgroundAudioPath, offset)
