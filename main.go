@@ -20,6 +20,12 @@ func main() {
         return
     }
 
+    e := setupServer()
+
+    startServer(e)
+}
+
+func setupServer() *echo.Echo{
 	e := echo.New()
 
 	e.Use(middleware.Logger())
@@ -32,6 +38,8 @@ func main() {
 	e.GET("/api/video/:id", func(c echo.Context) error { return handle.HandleVideoDownloadRequest(&store, c) })
 
     startServer(e)
+
+    return e
 }
 
 func startServer(e *echo.Echo) {
@@ -43,5 +51,20 @@ func startServer(e *echo.Echo) {
         port = "8000"
     }
 
-    e.Logger.Fatal(e.Start(host + ":" + port))
+    address := host + ":" + port
+
+    useTLS := os.Getenv("PUMPSYNC_USE_TLS")
+
+    var err error
+
+    if useTLS == "1" {
+        certificate := os.Getenv("PUMPSYNC_TLS_CERT")
+        key := os.Getenv("PUMPSYNC_TLS_KEY")
+
+        err = e.StartTLS(address, certificate, key)
+    } else {
+        err = e.Start(address)
+    }
+
+    e.Logger.Fatal(err)
 }

@@ -1,5 +1,6 @@
 Organization:
 - Add request state struct
+- Implement environment variable configuration module 
 
 Documentation:
 - Document websocket protocol
