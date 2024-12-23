@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 
@@ -15,8 +16,9 @@ import (
 
 func main() {
     err := godotenv.Load()
-    if err != nil {
-        slog.Error("Error loading .env file")
+
+    if err != nil && !errors.Is(err, os.ErrNotExist) {
+        slog.Error("Error loading .env file", "err", err)
         return
     }
 
