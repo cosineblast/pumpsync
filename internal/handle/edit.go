@@ -157,8 +157,10 @@ func tryEditVideo(savedFile string, youtubeUrl string) (string, *responseError) 
 
         if errors.Is(err, mediasync.TooLowScoreError) {
             return "", editLocateFailed
+        } else if errors.Is(err, mediasync.DownloadError) {
+            return "", editDownloadFailed
         } else {
-            return "", editFailed
+            return "", editFailedGeneric
         }
 	}
 

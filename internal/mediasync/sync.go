@@ -416,7 +416,6 @@ func extractAudioFromVideo(videoPath string) (string, error) {
 	return audioFile.Name(), nil
 }
 
-var TooLowScoreError = errors.New("match score was too low to continue execution")
 
 func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) error {
 
@@ -441,12 +440,16 @@ func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) 
 	return nil
 }
 
+var TooLowScoreError = errors.New("audio match score was too low")
+
+var DownloadError = errors.New("video download failed")
+
 func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error) {
 
 	foregroundVideoPath, err := downloadYoutubeVideo(youtubeLink)
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("[%w] %w", DownloadError, err)
 	}
 
 	defer os.Remove(foregroundVideoPath)
@@ -478,7 +481,7 @@ func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error
 	offset, score, _, err := locateAudio(backgroundAudioPath, trimmedForegroundAudioPath)
 
 	if score < MINIMUM_FINAL_MATCH_SCORE {
-		return "", TooLowScoreError
+		return "", fmt.Errorf("[%w] %f", TooLowScoreError, score)
 	}
 
 	finalAudio, err := overwriteAudioSegment(trimmedForegroundAudioPath, backgroundAudioPath, offset)
