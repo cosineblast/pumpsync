@@ -28,7 +28,7 @@ func (store *VideoStore) FetchVideo(id uuid.UUID) *string {
 }
 
 // Moves the file in the given file to the video store
-// the file will be automatically removed from the store after 5 minutes.
+// the file will be automatically removed from the store after 20 minutes.
 func (store *VideoStore) AddVideo(path string) (uuid.UUID, error) {
 
 	var err error
@@ -62,7 +62,7 @@ func (store *VideoStore) AddVideo(path string) (uuid.UUID, error) {
 	store.availableVideos.Store(uid, file.Name())
 
 	go func() {
-		time.Sleep(time.Duration(5 * time.Minute))
+		time.Sleep(time.Duration(20 * time.Minute))
 
 		store.availableVideos.Delete(uid)
 		os.Remove(file.Name())
