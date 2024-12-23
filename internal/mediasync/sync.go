@@ -426,7 +426,8 @@ func overwriteVideoAudio(videoPath string, audioPath string, resultPath string) 
 		"-map", "0:v",
 		"-map", "1:0",
 		"-f", "mp4",
-		"-c", "copy",
+        "-c:v", "copy",
+        "-c:a", "aac",
 		resultPath)
 
 	log.Println("running ffmpeg to overwrite video audio")
