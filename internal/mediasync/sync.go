@@ -481,11 +481,19 @@ func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error
 
 	offset, score, _, err := locateAudio(backgroundAudioPath, trimmedForegroundAudioPath)
 
+    if err != nil {
+        return "", err
+    }
+
 	if score < MINIMUM_FINAL_MATCH_SCORE {
 		return "", fmt.Errorf("[%w] %f", TooLowScoreError, score)
 	}
 
 	finalAudio, err := overwriteAudioSegment(trimmedForegroundAudioPath, backgroundAudioPath, offset)
+
+    if err != nil {
+        return "", err
+    }
 
 	defer os.Remove(finalAudio)
 
