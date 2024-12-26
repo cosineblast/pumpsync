@@ -39,7 +39,7 @@ type audioMatch = struct {
 
 func locateAudio(haystackPath string, needlePath string) (float64, float64, error) {
 	log.Println("running locate script")
-	cmd := newCommand("./internal/py/locate_audio.py", haystackPath, needlePath)
+	cmd := newCommand("./locate/locate_audio", haystackPath, needlePath)
 
 	stdout, err := cmd.Output()
 

@@ -1,0 +1,9 @@
+[package]
+name = "ps_locate"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hound = "3.5.1"
+rustfft = "6.2.0"
+tempfile = "3.14.0"
