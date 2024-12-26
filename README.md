@@ -16,14 +16,9 @@ These are some of the hurdles `pumpsync` aims to help with.
 This repository contains the backend code for the pumpsync website.
 The source for the frontend can be found at [pumpsync_front](https://github.com/cosineblast/pumpsync_front).
 
-## What it does
-
-TODO
-
-
 ## Running this
 
-A `Dockerfile` is also provided for deployment.
+A `Dockerfile` is provided for deployment.
 
 The json API endpoints are documented in (TODO).
 The websocket API endpoints are documented in (TODO).
@@ -40,19 +35,21 @@ The executable will use the following environment variables:
 | PUMPSYNC_TLS_CERT | - | When `PUMPSYNC_USE_TLS` is defined, this variable represents the path to the file where the TLS certificate to be used is stored |
 | PUMPSYNC_TLS_KEY | - | When `PUMPSYNC_USE_TLS` is defined, this variable represents the path to a file where the TLS certificate key to be used is stored |
 
+The audio location program, in release mode, is optimized to at most 512MB, when given two 44.1khz wav files with 3 minutes or less.
+
 ## Developing this
 
 This project uses [devbox](https://github.com/jetify-com/devbox), so you can load all the development dependencies by running `devbox shell`.
-Then, to build and run, `go run .`
+Then, to build and run the server executable run, you can use `make run`, which will build the server executable and the audio detection script.
 
-The program also reads environment variables from `.env` by default.
+For development convenience, the server program also reads environment variables from `.env` by default.
 
 ## How it works
 
-
-TODO
+Youtube videos are downloaded with `yt-dlp`, and most media manipulation is done with `ffmpeg`. Additionally, the audio detection functionality is implemented 
+a separate program, available in the `locate` directory. The script computes the [cross correlation](https://en.wikipedia.org/wiki/Cross-correlation) of the
+the audio files from the gameplay and youtube video, to find when the music begins in the gameplay video, and to detect game UI intro and outros in the provided youtube video.
 
 ## Plans
 
 - Implement video overlay
-- Replace python locate implementation with pure go implementations (or FFTw)

@@ -1,6 +1,6 @@
 Organization:
 - Add request state struct
-- Implement environment variable configuration module 
+- Implement environment variable configuration module
 
 Documentation:
 - Document websocket protocol
@@ -8,25 +8,21 @@ Documentation:
 
 UI:
 - Add more information about what's being done in the video editing process
-
-Structure:
-- Implement work queue
-- Implement youtube video cache
+- Check if youtube video exists before trying to download it (may produce better error messages)
+- Add server status in UI
+- Add 3 minute limit warning to UI
 
 Scale:
-- Cache youtube videos locally
+- Implement work queue
+- Cache youtube videos in S3 or something like that
 - Select better yt-dlp flags
 
 Robustness:
-- Check length of youtube video before trying to download it
-- Check if video is mp4 before running
+- Check duration of youtube video before trying to download it
+- Check duration of gameplay video before processing it
 - Apply CORS in general
 - Apply CORS in WebSocket requests
 
-Nice to have:
-- Replace python locate script with pure go implementation
-
 Features:
-- Add about page
 - Add rating feature, so users can rate the results they got
 - Add video overlay support
