@@ -1,16 +1,39 @@
 
+#
+# GO BUILD
+#
+
 FROM golang:1.23.4-alpine
 
-# at the current moment we use a simple python script for audio location
-# if we don't change our audio detection heursitic (least correlation point) 
-# it will probably be replaced with a pure go implementation, as we only need it 
-# for the scipy fft convolve
+WORKDIR /src
 
-RUN apk add python3
+COPY ./go.mod ./go.sum ./
 
-RUN python3 -m venv /opt/the_venv
-ENV VIRTUAL_ENV=/opt/the_venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN go mod download
+
+COPY ./main.go ./
+COPY ./internal ./internal/
+COPY ./res ./res/
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/pumpsync_backend
+
+#
+# RUST BUILD
+#
+
+FROM rust:1.83-alpine3.20
+
+COPY ./locate /src/
+
+WORKDIR /src
+
+RUN cargo build --release && mkdir -p /app && cp target/release/ps_locate /app/locate_audio
+
+#
+# RUNTIME
+#
+
+FROM alpine:3.21
 
 RUN apk add yt-dlp
 
@@ -18,20 +41,8 @@ RUN apk add ffmpeg
 
 WORKDIR /app
 
-COPY ./requirements.txt ./
+COPY --from=0 /app/pumpsync_backend /app/
+COPY --from=0 /src/res /app/res
+COPY --from=1 /app/locate_audio /app/locate_audio
 
-RUN pip install -r requirements.txt
-
-COPY ./go.mod ./go.sum ./
-
-RUN go mod download
-
-# TODO: only copy relevant files (such as main.go, internal and res/)
-COPY . ./
-
-# remember, this is a noop and is just here for documentation
-EXPOSE 8000
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/pumsync_backend
-
-CMD ["/app/pumsync_backend"]
+CMD ["/app/pumpsync_backend"]

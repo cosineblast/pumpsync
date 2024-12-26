@@ -9,4 +9,5 @@ env
 .env
 .devbox
 docker-compose.yaml
-locate/locate_audio
+locate
+locate_audio
