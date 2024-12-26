@@ -38,7 +38,7 @@ type audioMatch = struct {
 	NeedleDuration float64 `json:"needle_duration"`
 }
 
-func locateAudio(haystackPath string, needlePath string) (float64, float64, float64, error) {
+func locateAudio(haystackPath string, needlePath string) (float64, float64, error) {
 	log.Println("running locate script")
 	cmd := newCommand("./internal/py/locate_audio.py", haystackPath, needlePath)
 
@@ -49,7 +49,7 @@ func locateAudio(haystackPath string, needlePath string) (float64, float64, floa
 	}
 
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 
 	var message audioMatch
@@ -60,10 +60,10 @@ func locateAudio(haystackPath string, needlePath string) (float64, float64, floa
 	err = json.Unmarshal(stdout, &message)
 
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 
-	return message.Offset, message.Score, message.NeedleDuration, nil
+	return message.Offset, message.Score, nil
 }
 
 const AUDIO_START_MINIMUM_CONFIDENCE = 20
@@ -98,15 +98,21 @@ func focusAudio(path string) (*FocusSuccess, error) {
 
 	for _, entry := range audioPairs {
 
-		startOffset, startScore, startDuration, err := locateAudio(path, entry.startPath)
+		startOffset, startScore, err := locateAudio(path, entry.startPath)
 
 		if err != nil {
 			return nil, err
 		}
 
+        startDuration, err := getFileDuration(entry.startPath)
+
+        if err != nil {
+            return nil, err
+        }
+
 		log.Println("checking if audio matches ", entry.key)
 
-		endOffset, endScore, _, err := locateAudio(path, entry.endPath)
+		endOffset, endScore, err := locateAudio(path, entry.endPath)
 
 		if err != nil {
 			return nil, err
@@ -479,7 +485,7 @@ func ImproveAudio(backgroundVideoPath string, youtubeLink string) (string, error
 		return "", err
 	}
 
-	offset, score, _, err := locateAudio(backgroundAudioPath, trimmedForegroundAudioPath)
+	offset, score, err := locateAudio(backgroundAudioPath, trimmedForegroundAudioPath)
 
     if err != nil {
         return "", err
