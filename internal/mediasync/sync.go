@@ -35,7 +35,6 @@ func (f FocusFail) Error() string {
 type audioMatch = struct {
 	Offset         float64 `json:"offset"`
 	Score          float64 `json:"score"`
-	NeedleDuration float64 `json:"needle_duration"`
 }
 
 func locateAudio(haystackPath string, needlePath string) (float64, float64, error) {
@@ -55,7 +54,6 @@ func locateAudio(haystackPath string, needlePath string) (float64, float64, erro
 	var message audioMatch
 	message.Offset = 0
 	message.Score = 0
-	message.NeedleDuration = 0
 
 	err = json.Unmarshal(stdout, &message)
 

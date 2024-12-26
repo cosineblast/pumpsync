@@ -20,7 +20,7 @@ def locate_audio(haystack, needle):
 
     lowest_point = np.argmin(correlation)
 
-    # our heuristic is to find the lowest point of correlation then 
+    # our heuristic is to find the lowest point of correlation then
     # find the highest point near that one.
     highest_point = lowest_point + np.argmax(correlation[lowest_point:int(lowest_point+SUPPORTED_SAMPLE_RATE * 0.1)])
 
@@ -28,7 +28,7 @@ def locate_audio(haystack, needle):
 
     z_score = (np.max(correlation)- np.mean(correlation)) / np.std(correlation)
 
-    # sometimes things go really wrong and we end up estimating 
+    # sometimes things go really wrong and we end up estimating
     # that the audio starts somewhere impossible
     # in that case, the right thing to do is to claim that we have absolutely
     # no confidence on the result
@@ -72,8 +72,7 @@ def main(haystack_path: str, needle_path: str):
 
     print(json.dumps(
         {'offset': start / SUPPORTED_SAMPLE_RATE,
-         'score': score,
-         'needle_duration': len(needle) / SUPPORTED_SAMPLE_RATE }))
+         'score': score }))
 
 if __name__ == '__main__':
     fire.Fire(main)
