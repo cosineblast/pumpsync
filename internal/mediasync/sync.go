@@ -406,7 +406,8 @@ func extractAudioFromVideo(videoPath string) (string, error) {
 	cmd := newCommand("ffmpeg",
 		"-y",
 		"-i", videoPath,
-		"-ar", "48000",
+		"-ar", "44100",
+        "-ac", "1",
 		audioFile.Name())
 
 	log.Println("running ffmpeg to convert video to audio")
