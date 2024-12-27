@@ -10,3 +10,4 @@ env
 .devbox
 docker-compose.yaml
 locate_audio
+pumpsync

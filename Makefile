@@ -1,6 +1,6 @@
 
 run: server locate_audio
-	go run .
+	./pumpsync
 
 server:
 	go build .
