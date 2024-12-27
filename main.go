@@ -32,12 +32,15 @@ func setupServer() *echo.Echo{
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Use(middleware.CORS())
 
 	store := video_store.NewVideoStore()
 
 	e.GET("/api/edit", func(c echo.Context) error { return handle.HandleEditRequest(&store, c) })
 
 	e.GET("/api/video/:id", func(c echo.Context) error { return handle.HandleVideoDownloadRequest(&store, c) })
+
+	e.GET("/api/status", func(c echo.Context) error { return handle.HandleStatusRequest(c) })
 
     startServer(e)
 
