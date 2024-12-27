@@ -1,3 +1,14 @@
+///
+/// This module implements an executable tailored for the detection of the offset of audio in another one,
+/// for the pumpsync backend. The program receives the path of two mono channel wav files from the command
+/// line, known as 'haystack' and 'needle' respectively, and tries to determine when does 
+/// 'needle' play in 'haystack'.
+///
+/// One of its main goals is to use less than 512MiB of RAM when given two 44.1k .wav files with 3
+/// minutes of duration less, so that it is possible to run it within a constricted memory
+/// environment.
+
+
 use std::{fs::File, io::{BufReader, BufWriter, Read, Seek, Write}};
 
 use hound::WavReader;

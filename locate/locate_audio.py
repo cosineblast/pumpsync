@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# This is the reference implementation for the audio offset detection script.
+# This is still in the repository mostly for testing and debugging purposes.
+
 import numpy as np
 
 import scipy.io.wavfile as wavfile
