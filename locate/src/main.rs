@@ -1,79 +1,96 @@
 ///
 /// This module implements an executable tailored for the detection of the offset of audio in another one,
 /// for the pumpsync backend. The program receives the path of two mono channel wav files from the command
-/// line, known as 'haystack' and 'needle' respectively, and tries to determine when does 
+/// line, known as 'haystack' and 'needle' respectively, and tries to determine when does
 /// 'needle' play in 'haystack'.
 ///
 /// One of its main goals is to use less than 512MiB of RAM when given two 44.1k .wav files with 3
 /// minutes of duration less, so that it is possible to run it within a constricted memory
 /// environment.
-
-
-use std::{fs::File, io::{BufReader, BufWriter, Read, Seek, Write}};
+use std::{
+    fs::File,
+    io::{BufReader, BufWriter, Read, Seek, Write},
+};
 
 use hound::WavReader;
-use rustfft::{algorithm::Radix4, num_complex::{Complex, Complex32}, Fft, FftDirection, FftNum};
+use rustfft::{
+    algorithm::Radix4,
+    num_complex::{Complex, Complex32},
+    Fft, FftDirection, FftNum,
+};
 use tempfile::tempfile;
 
-trait BasicallyAFloat : PartialOrd + FftNum + From<f32> + Default + Into<f64> {
-}
+trait BasicallyAFloat: PartialOrd + FftNum + From<f32> + Default + Into<f64> {}
 
-impl BasicallyAFloat for f32 { }
-impl BasicallyAFloat for f64 { }
+impl BasicallyAFloat for f32 {}
+impl BasicallyAFloat for f64 {}
 
 fn find_target_size(my_size: usize, other_size: usize) -> usize {
-    let n = my_size + other_size  - 1;
+    let n = my_size + other_size - 1;
 
     n.next_power_of_two()
 }
 
-fn read_and_pad<T>(reader: &mut WavReader<BufReader<File>>, my_size: usize, other_size: usize) -> Vec<Complex<T>>
-    where T: BasicallyAFloat
+fn read_and_pad<T>(
+    reader: &mut WavReader<BufReader<File>>,
+    my_size: usize,
+    other_size: usize,
+) -> Vec<Complex<T>>
+where
+    T: BasicallyAFloat,
 {
     assert_eq!(reader.duration(), my_size as u32);
 
     let target_buffer_size = find_target_size(my_size, other_size);
 
-    let mut buffer: Vec<Complex<T>> =
-        Vec::with_capacity(target_buffer_size);
+    let mut buffer: Vec<Complex<T>> = Vec::with_capacity(target_buffer_size);
 
     for sample in sample_iterator(reader) {
-        buffer.push(Complex{ re: T::from(sample), im: T::default() })
+        buffer.push(Complex {
+            re: T::from(sample),
+            im: T::default(),
+        })
     }
 
     for _ in 0..(target_buffer_size - my_size) {
-        buffer.push(Complex{ re: T::default(), im: T::default() })
+        buffer.push(Complex {
+            re: T::default(),
+            im: T::default(),
+        })
     }
 
     assert_eq!(buffer.len(), buffer.capacity());
 
-    return buffer;
+    buffer
 }
 
 // we can't just return a non-heaped iterator because we return different iterator types
 // for depending on wether it is an integer wav or a floating wav
-fn sample_iterator<'a>(reader: &'a mut WavReader<BufReader<File>>) -> Box<dyn Iterator<Item = f32> + 'a> {
-
+fn sample_iterator<'a>(
+    reader: &'a mut WavReader<BufReader<File>>,
+) -> Box<dyn Iterator<Item = f32> + 'a> {
     let spec = reader.spec();
 
     // right now our backend will just make sure the files are mono, but in the future we may
     // want to convert it to mono ourselves by averaging the channels
-    assert_eq!(spec.channels, 1, "this program does not support stereo channels");
+    assert_eq!(
+        spec.channels, 1,
+        "this program does not support stereo channels"
+    );
 
     let thing: Box<dyn Iterator<Item = f32>> = match spec.sample_format {
         hound::SampleFormat::Float => {
             Box::new(reader.samples::<f32>().map(|sample| sample.unwrap()))
-        },
-        hound::SampleFormat::Int =>
+        }
+        hound::SampleFormat::Int => {
             Box::new(reader.samples::<i32>().map(|sample| sample.unwrap() as f32))
+        }
     };
 
     thing
 }
 
-
 fn freeze(buffer: Vec<Complex32>) -> std::io::Result<File> {
-
     eprintln!("freezing {} elements...\n", buffer.len());
 
     let mut file = BufWriter::new(tempfile()?);
@@ -92,11 +109,10 @@ fn freeze(buffer: Vec<Complex32>) -> std::io::Result<File> {
 
     eprintln!("freezing done\n");
 
-    return Ok(file.into_inner()?)
+    Ok(file.into_inner()?)
 }
 
 fn unfreeze(file: File) -> std::io::Result<Vec<Complex<f32>>> {
-
     let mut file = BufReader::new(file);
 
     eprintln!("unfreezing...\n");
@@ -121,7 +137,10 @@ fn unfreeze(file: File) -> std::io::Result<Vec<Complex<f32>>> {
         let real = f32::from_le_bytes(real_bytes);
         let imaginary = f32::from_le_bytes(imaginary_bytes);
 
-        result.push(Complex{ re: real, im: imaginary});
+        result.push(Complex {
+            re: real,
+            im: imaginary,
+        });
     }
 
     assert_eq!(result.capacity(), len);
@@ -132,7 +151,10 @@ fn unfreeze(file: File) -> std::io::Result<Vec<Complex<f32>>> {
     Ok(result)
 }
 
-fn compute_fft(mut buffer: Vec<Complex<f32>>, direction: rustfft::FftDirection) -> Vec<Complex<f32>> {
+fn compute_fft(
+    mut buffer: Vec<Complex<f32>>,
+    direction: rustfft::FftDirection,
+) -> Vec<Complex<f32>> {
     let n = buffer.len();
 
     let forward = Radix4::<f32>::new(n, direction);
@@ -149,23 +171,21 @@ fn compute_fft(mut buffer: Vec<Complex<f32>>, direction: rustfft::FftDirection) 
 
     forward.process_with_scratch(&mut buffer, &mut scratch);
 
-    return buffer
+    buffer
 }
 
 // receives two vectors of complex values which are in frequency domain, and computes the correlation for them
-fn compute_correlation_post_fft(mut haystack_buffer: Vec<Complex<f32>>, needle_buffer: Vec<Complex<f32>> ,
+fn compute_correlation_post_fft(
+    mut haystack_buffer: Vec<Complex<f32>>,
+    needle_buffer: Vec<Complex<f32>>,
     haystack_sample_count: usize,
-    needle_sample_count: usize) -> Vec<Complex<f32>>
-{
-
+    needle_sample_count: usize,
+) -> Vec<Complex<f32>> {
     assert_eq!(haystack_buffer.len(), needle_buffer.len());
     let n = haystack_buffer.len();
 
     for i in 0..n {
-        haystack_buffer[i] =
-            haystack_buffer[i] *
-            needle_buffer[i]
-            / (n as f32);
+        haystack_buffer[i] = haystack_buffer[i] * needle_buffer[i] / (n as f32);
     }
 
     drop(needle_buffer);
@@ -174,52 +194,61 @@ fn compute_correlation_post_fft(mut haystack_buffer: Vec<Complex<f32>>, needle_b
 
     result.truncate(haystack_sample_count + needle_sample_count - 1);
 
-    return result;
+    result
 }
 
 fn compute_mean_stddev_re<F>(stuff: &[Complex<F>]) -> (f64, f64)
-    where F: BasicallyAFloat {
-    let mean = stuff.iter().map(|it| it.re.into() as f64).sum::<f64>() / (stuff.len() as f64);
+where
+    F: BasicallyAFloat,
+{
+    let mean = stuff.iter().map(|it| it.re.into()).sum::<f64>() / (stuff.len() as f64);
 
-    let variance = stuff.iter().map(|it| {
-        let difference = it.re.into() as f64 - mean;
+    let variance = stuff
+        .iter()
+        .map(|it| {
+            let difference = it.re.into() - mean;
 
-        difference * difference
-    }).sum::<f64>() / (stuff.len() as f64);
+            difference * difference
+        })
+        .sum::<f64>()
+        / (stuff.len() as f64);
 
     (mean, variance.sqrt())
 }
 
-fn locate_audio_start(correlation: &[Complex<f32>],
+fn locate_audio_start(
+    correlation: &[Complex<f32>],
     needle_sample_count: usize,
     haystack_sample_count: usize,
-    sample_rate: usize) -> (usize, f64) where {
-
-    let min_correlation =
-        correlation.iter()
+    sample_rate: usize,
+) -> (usize, f64) where {
+    let min_correlation = correlation
+        .iter()
         .enumerate()
         .min_by(|l, r| l.1.re.partial_cmp(&r.1.re).unwrap())
         .unwrap();
 
     let fraction_of_second = sample_rate / 10;
 
-    let max_post_min_correlation =
-        correlation[min_correlation.0..min_correlation.0+fraction_of_second].iter()
+    let max_post_min_correlation = correlation
+        [min_correlation.0..min_correlation.0 + fraction_of_second]
+        .iter()
         .enumerate()
         .max_by(|l, r| l.1.re.partial_cmp(&r.1.re).unwrap())
         .unwrap();
 
-    let max_correlation =
-        correlation.iter()
+    let max_correlation = correlation
+        .iter()
         .max_by(|l, r| l.re.partial_cmp(&r.re).unwrap())
         .unwrap();
 
     // we convert it to i64 because sometimes calcuations go wrong and give us a
     // negative audio start number. we should react to this accordingly
-    let audio_start = (min_correlation.0 + max_post_min_correlation.0) as i64 - needle_sample_count as i64 + 1;
+    let audio_start =
+        (min_correlation.0 + max_post_min_correlation.0) as i64 - needle_sample_count as i64 + 1;
 
     // now, we need to give a confidence score to our guess,
-    let (mean, stddev) = compute_mean_stddev_re(&correlation);
+    let (mean, stddev) = compute_mean_stddev_re(correlation);
 
     let z_score = (max_correlation.re as f64 - mean) / stddev;
 
@@ -228,14 +257,13 @@ fn locate_audio_start(correlation: &[Complex<f32>],
     // in that case, the right thing to do is to claim that we have absolutely
     // no confidence on the result
     if audio_start < 0 || audio_start as usize >= haystack_sample_count {
-        return (0, 0.0)
+        return (0, 0.0);
     }
 
-    return (audio_start as usize, z_score)
+    (audio_start as usize, z_score)
 }
 
 fn main() {
-
     let mut args = std::env::args();
 
     args.next();
@@ -250,19 +278,31 @@ fn main() {
 
     let sample_rate = haystack_reader.spec().sample_rate;
 
-    assert_eq!(sample_rate, needle_reader.spec().sample_rate, "Files have non matching sample rates");
+    assert_eq!(
+        sample_rate,
+        needle_reader.spec().sample_rate,
+        "Files have non matching sample rates"
+    );
 
     let haystack_sample_count = haystack_reader.duration() as usize;
 
     let needle_sample_count = needle_reader.duration() as usize;
 
-    let haystack_buffer = read_and_pad::<f32>(&mut haystack_reader, haystack_sample_count, needle_sample_count);
+    let haystack_buffer = read_and_pad::<f32>(
+        &mut haystack_reader,
+        haystack_sample_count,
+        needle_sample_count,
+    );
 
     let haystack_fft = compute_fft(haystack_buffer, FftDirection::Forward);
 
     let frozen_haystack_fft = freeze(haystack_fft).unwrap();
 
-    let mut needle_buffer = read_and_pad::<f32>(&mut needle_reader, needle_sample_count, haystack_sample_count);
+    let mut needle_buffer = read_and_pad::<f32>(
+        &mut needle_reader,
+        needle_sample_count,
+        haystack_sample_count,
+    );
 
     needle_buffer[0..needle_sample_count].reverse();
 
@@ -270,18 +310,25 @@ fn main() {
 
     let haystack_fft = unfreeze(frozen_haystack_fft).unwrap();
 
-    let correlation = compute_correlation_post_fft(haystack_fft, needle_fft, haystack_sample_count, needle_sample_count);
+    let correlation = compute_correlation_post_fft(
+        haystack_fft,
+        needle_fft,
+        haystack_sample_count,
+        needle_sample_count,
+    );
 
-    let (audio_start_sample, score) = locate_audio_start(&correlation, needle_sample_count, haystack_sample_count, sample_rate as usize);
+    let (audio_start_sample, score) = locate_audio_start(
+        &correlation,
+        needle_sample_count,
+        haystack_sample_count,
+        sample_rate as usize,
+    );
 
     let audio_start = audio_start_sample as f64 / (sample_rate as f64);
 
     // todo: use serde?
-    println!(r#" {{"offset":{}, "score": {} }}"#,
-        audio_start,
-        score);
+    println!(r#" {{"offset":{}, "score": {} }}"#, audio_start, score);
 }
 
 #[cfg(test)]
-mod test {
-}
+mod test {}
